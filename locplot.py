@@ -12,14 +12,14 @@ import plotly.offline as py
 import plotly.graph_objs as go
 
 
-N_RELEASES = 20
+N_RELEASES = 52
 
 
 def is_url(url):
     return urlparse(url).scheme != ''
 
-def is_git_dir(dir):
-    return os.path.isdir(os.path.join(repository, '.git'))
+def is_git_repository(path):
+    return os.path.isdir(os.path.join(path, '.git'))
 
 def sh(cmd, path=None):
     result = subprocess.run(cmd, stdout=subprocess.PIPE, cwd=path)
@@ -35,7 +35,7 @@ def bootstrap(repository):
     if is_url(repository):
         path = tempfile.mkdtemp()
         git(['clone', repository, path])
-    elif is_git_dir(repository):
+    elif is_git_repository(repository):
         path = repository
         if len(git(['status', '-s'], path)) > 0:
             sys.exit('Found uncommitted changes!')    
@@ -67,8 +67,8 @@ def get_loc(tag, path, exclude):
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('repository', help='A git repository,')
-parser.add_argument('--output', nargs='?', help='The output file with the report.')
+parser.add_argument('repository', help='A git repository.')
+parser.add_argument('--output', nargs='?', metavar='file', help='Write the results to <file>.')
 parser.add_argument('--exclude', nargs='?', help='Ignore files matching this expression.')
 args = parser.parse_args()
 
@@ -90,20 +90,20 @@ git(['checkout', branch], path)
 bars = []
 for language, data in stats.items():
     bar = go.Bar(
-     x = data['x'],
-     y = data['y'],
-     name= language,
-     width=1)
+        x = data['x'],
+        y = data['y'],
+        name = language,
+        width = 1)
     bars.append(bar)
 
 layout = go.Layout(
-    barmode='stack'
+    barmode ='stack'
 )
 
 figure = go.Figure(data=bars, layout=layout)
 
 if args.output: 
-    outfname=args.output
+    outfname = args.output
 else:
-    outfname='loc.html'
+    outfname = 'loc.html'
 py.plot(figure, filename=outfname)
