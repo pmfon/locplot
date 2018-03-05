@@ -1,9 +1,10 @@
 # locplot
-Track LoC across releases
+Plot LoC count by release.
 
 ## Dependencies
 ```sh
-cargo install tokei --features all
-
-pip install plotly
+$ curl https://sh.rustup.rs -sSf | sh
+$ cargo install tokei --features all
+$ pip3 install plotly
 ```
+

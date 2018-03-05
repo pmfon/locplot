@@ -49,9 +49,6 @@ def bootstrap(repository):
 def get_tags(path):
     result = git(['tag', '--sort', 'v:refname'], path)
     tags = result.split()[-N_RELEASES:]
-    if len(tags) < 1:
-        print('No releases found!')
-        sys.exit(0)
     return tags
 
 def get_loc(tag, path, exclude):
@@ -60,50 +57,75 @@ def get_loc(tag, path, exclude):
 
     cmd = ['tokei', '--output', 'json']
     if exclude:
-        cmd += ['--exclude', exclude]
+        for e in exclude:
+            cmd.append('--exclude')
+            cmd.append(e)
 
     result = sh(cmd, path)
     return json.loads(result)
 
+def generate_stats(path, exclude):
+    tags = get_tags(path)
 
-parser = argparse.ArgumentParser()
-parser.add_argument('repository', help='A git repository.')
-parser.add_argument('--output', nargs='?', metavar='file', help='Write the results to <file>.')
-parser.add_argument('--exclude', nargs='?', help='Ignore files matching this expression.')
-args = parser.parse_args()
+    stats = defaultdict(lambda: defaultdict(list))
+    for tag in tags:
+        tmp_stats = get_loc(tag, path, exclude)    
+        for language, count in tmp_stats.items():
+            stats[language]['x'].append(tag)
+            stats[language]['y'].append(count['code'])
+            if count['comments'] > 0:
+                stats['Comments']['x'].append(tag)
+                stats['Comments']['y'].append(count['comments'])
+    return stats
 
-path, branch = bootstrap(args.repository)
-tags = get_tags(path)
+def plot(stats, filename=None):
+    bars = []
+    for language, data in stats.items():
+        bar = go.Bar(
+            x = data['x'],
+            y = data['y'],
+            name = language,
+            width = 1)
+        bars.append(bar)
+    layout = go.Layout(
+        barmode ='stack'
+    )
 
-stats = defaultdict(lambda: defaultdict(list))
-for tag in tags:
-    tmp_stats = get_loc(tag, path, args.exclude)    
-    for language, count in tmp_stats.items():
-        stats[language]['x'].append(tag)
-        stats[language]['y'].append(count['code'])
-        if count['comments'] > 0:
-            stats['Comments']['x'].append(tag)
-            stats['Comments']['y'].append(count['comments'])
+    figure = go.Figure(data=bars, layout=layout)
+    if filename is None: 
+        filename = 'loc.html'
+    py.plot(figure, filename=filename)
 
-git(['checkout', branch], path)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('repository', help='a git repository')
+    parser.add_argument('--output', metavar='file', help='write the results to <file>. Defaults to "loc.html"')
+    parser.add_argument('--exclude', type=str, action='append', metavar='glob_expression', help='ignore matching files')
+    args = parser.parse_args()
 
-bars = []
-for language, data in stats.items():
-    bar = go.Bar(
-        x = data['x'],
-        y = data['y'],
-        name = language,
-        width = 1)
-    bars.append(bar)
+    path, branch = bootstrap(args.repository)
 
-layout = go.Layout(
-    barmode ='stack'
-)
+    try:        
+        stats = generate_stats(path, args.exclude)
+        plot(stats, args.output)
+    except Exception as e:
+        print(e)
+    finally:
+         git(['checkout', branch], path)
 
-figure = go.Figure(data=bars, layout=layout)
+if __name__ == '__main__':
+    main()
 
-if args.output: 
-    outfname = args.output
-else:
-    outfname = 'loc.html'
-py.plot(figure, filename=outfname)
+
+
+
+
+
+
+
+
+
+
+
+
+
